@@ -2,3 +2,4 @@
 *.out
 asm_data.h
 /build
+a.asm
