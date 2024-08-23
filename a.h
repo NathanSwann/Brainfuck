@@ -7,7 +7,10 @@ typedef int It;
 typedef size_t SZt;
 typedef void Vt;
 typedef __uint64_t U64t;
+typedef __uint32_t U32t;
 typedef __int64_t I64t;
+typedef __int32_t I32t;
+
 
 #define R(x) return x
 #define ASSERTFALSE(a,msg) if(a){printf(msg);exit(1);}

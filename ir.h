@@ -16,6 +16,8 @@ typedef enum BF_OP_KIND
     RET,
     SET_VALUE,
     MUL_ADD_COPY,
+    EMPTY_RET,
+    EMPTY_JMP
 } BF_OP_KIND;
 
 typedef struct

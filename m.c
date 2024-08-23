@@ -108,10 +108,14 @@ void bf_to_asm(FILE *fd, BF_PROG prog)
             fprintf(fd, "add r9, %ld\n", prog.is[i].op);
             break;
         case INC:
-            fprintf(fd, "add byte [tape+r9*1], %ld\n", prog.is[i].op);
+            U32t amount = (U32t)prog.is[i].op;
+            I32t offset = (I32t)(prog.is[i].op>>32);
+            fprintf(fd, "add byte [tape+r9*1 + %d], %d\n", offset, amount);
             break;
         case DEC:
-            fprintf(fd, "sub byte [tape+r9*1], %ld\n", prog.is[i].op);
+            amount = (U32t)prog.is[i].op;
+            offset = (I32t)(prog.is[i].op>>32);
+            fprintf(fd, "sub byte [tape+r9*1 + %d], %d\n", offset, amount);
             break;
         case OUT:
             fprintf(fd, "call output\n");
@@ -132,37 +136,42 @@ void bf_to_asm(FILE *fd, BF_PROG prog)
             // fprintf(fd,"syscall\n");
             break;
         case JMP:
-            fprintf(fd, ".jmp_%ld:\n", prog.is[i].op >> 32);
             fprintf(fd, "mov r8b, byte [tape+r9*1]\n");
             fprintf(fd, "test r8b,r8b\n");
             fprintf(fd, "jz .ret_%ld\n", (prog.is[i].op << 32) >> 32);
+        case EMPTY_JMP:
+            fprintf(fd, ".jmp_%ld:\n", prog.is[i].op >> 32);
             break;
         case RET:
-            fprintf(fd, ".ret_%ld:\n", prog.is[i].op >> 32);
             fprintf(fd, "mov r8b,byte [tape+r9*1]\n");
             fprintf(fd, "test r8b,r8b\n");
             fprintf(fd, "jnz .jmp_%ld\n", (prog.is[i].op << 32) >> 32);
+        case EMPTY_RET:
+            fprintf(fd, ".ret_%ld:\n", prog.is[i].op >> 32);
             break;
         case SET_VALUE:
-            fprintf(fd, "mov byte [tape+r9*1], %ld\n", prog.is[i].op);
+            amount = (U32t)prog.is[i].op;
+            offset = (I32t)(prog.is[i].op>>32);
+            fprintf(fd, "mov byte [tape+r9*1+%d], %d\n", offset,amount);
             break;
         case MUL_ADD_COPY:
-            fprintf(fd,";;MUL\n");
-            MUL_OFFSET_DATA* mul_ins =  (MUL_OFFSET_DATA*)prog.is[i].op; // yes i know
+            fprintf(fd, ";;MUL\n");
+            MUL_OFFSET_DATA *mul_ins = (MUL_OFFSET_DATA *)prog.is[i].op; // yes i know
             int a = 0;
-            while(mul_ins[a].offset != 0) {
-                fprintf(fd,"mov al, byte [tape+r9*1]\n");
-                fprintf(fd,"mov rdx, %ld\n",mul_ins[a].factor);
-                fprintf(fd,"mul rdx\n");
-                fprintf(fd,"add byte[tape + r9*1 + %ld], al\n",mul_ins[a].offset);
+            while (mul_ins[a].offset != 0)
+            {
+                fprintf(fd, "mov al, byte [tape+r9*1]\n");
+                fprintf(fd, "mov rdx, %ld\n", mul_ins[a].factor);
+                fprintf(fd, "mul rdx\n");
+                fprintf(fd, "add byte[tape + r9*1 + %ld], al\n", mul_ins[a].offset);
                 a++;
             }
-            fprintf(fd,"mov byte[tape + r9*1],0\n");
-            fprintf(fd,";;endMUL\n");
+            fprintf(fd, "mov byte[tape + r9*1],0\n");
+            fprintf(fd, ";;endMUL\n");
             break;
         default:
             printf("UNHANDLED OPERATOR!\n");
-            printf("%d\n",prog.is[i].k == INP);
+            printf("%d\n", prog.is[i].k == INP);
             fflush(stdout);
             exit(2);
             break;
@@ -182,16 +191,19 @@ int main(int argc, STR *argv)
     }
     STR data = load_file(args.in_file_path);
     BF_PROG a = bf_lex(data);
+    // TODO: CLEAN THIS UP
     BF_PROG opt = simplify_clear_commands(a);
     BF_PROG opt2 = copy_and_multiply_commands(opt);
+    BF_PROG opt3 = add_offsets(opt2);
+    BF_PROG opt4 = remove_unneeded_jumps(opt3);
     FILE *fd = fopen("a.asm", "w");
     if (args.mode == COMPILE_MODE)
     {
-        bf_to_asm(fd, opt2);
+        bf_to_asm(fd, opt4);
         fclose(fd);
         if (args.assemble)
         {
-            system("nasm -felf64 -g a.asm && ld a.o");
+            system("nasm -felf64 a.asm && ld a.o");
         }
     }
     free(opt.is);
